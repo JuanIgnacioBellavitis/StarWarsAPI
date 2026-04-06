@@ -11,6 +11,15 @@ export class Movie {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Column({
+    name: 'swapi_uid',
+    type: 'varchar',
+    length: 64,
+    nullable: true,
+    unique: true,
+  })
+  swapiUid: string | null;
+
   @Column({ type: 'varchar', length: 255 })
   title: string;
 
