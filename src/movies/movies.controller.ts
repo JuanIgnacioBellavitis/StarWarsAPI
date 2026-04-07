@@ -19,6 +19,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { UserRole } from '../common/enums/user-role.enum';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { CreateMovieDto } from './dto/create-movie.dto';
+import { MovieResponseDto } from './dto/movie-response.dto';
 import { UpdateMovieDto } from './dto/update-movie.dto';
 import { MoviesService } from './movies.service';
 
@@ -32,7 +33,7 @@ export class MoviesController {
   @Get()
   @Roles(UserRole.ADMIN, UserRole.REGULAR)
   @ApiOperation({ summary: 'Get movie list' })
-  @ApiOkResponse({ description: 'Movies retrieved successfully' })
+  @ApiOkResponse({ type: [MovieResponseDto], description: 'Movies retrieved successfully' })
   findAll() {
     return this.moviesService.findAll();
   }
@@ -40,7 +41,7 @@ export class MoviesController {
   @Get(':id')
   @Roles(UserRole.REGULAR)
   @ApiOperation({ summary: 'Get a movie detail' })
-  @ApiOkResponse({ description: 'Movie retrieved successfully' })
+  @ApiOkResponse({ type: MovieResponseDto, description: 'Movie retrieved successfully' })
   findById(@Param('id') id: string) {
     return this.moviesService.findById(id);
   }
@@ -48,7 +49,7 @@ export class MoviesController {
   @Post()
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Create a new movie (admin only)' })
-  @ApiOkResponse({ description: 'Movie created successfully' })
+  @ApiOkResponse({ type: MovieResponseDto, description: 'Movie created successfully' })
   create(@Body() createMovieDto: CreateMovieDto) {
     return this.moviesService.create(createMovieDto);
   }
@@ -56,7 +57,7 @@ export class MoviesController {
   @Patch(':id')
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Update a movie (admin only)' })
-  @ApiOkResponse({ description: 'Movie updated successfully' })
+  @ApiOkResponse({ type: MovieResponseDto, description: 'Movie updated successfully' })
   update(@Param('id') id: string, @Body() updateMovieDto: UpdateMovieDto) {
     return this.moviesService.update(id, updateMovieDto);
   }

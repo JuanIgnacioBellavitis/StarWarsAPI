@@ -4,6 +4,7 @@ import * as bcrypt from 'bcrypt';
 import { UserRole } from '../common/enums/user-role.enum';
 import { UsersService } from '../users/users.service';
 import { AuthService } from './auth.service';
+import { LoginResponseDto, SignupResponseDto } from './dto/auth-response.dto';
 
 jest.mock('bcrypt', () => ({
   hash: jest.fn(),
@@ -47,12 +48,15 @@ describe('AuthService', () => {
         'test@mail.com',
         'hashed-password',
       );
-      expect(response).toEqual({
-        id: 'user-id',
-        email: 'test@mail.com',
-        role: UserRole.REGULAR,
-        createdAt: new Date('2026-01-01'),
-      });
+      expect(response).toBeInstanceOf(SignupResponseDto);
+      expect(response).toEqual(
+        expect.objectContaining({
+          id: 'user-id',
+          email: 'test@mail.com',
+          role: UserRole.REGULAR,
+          createdAt: new Date('2026-01-01'),
+        }),
+      );
     });
   });
 
@@ -100,7 +104,8 @@ describe('AuthService', () => {
         email: 'test@mail.com',
         role: UserRole.ADMIN,
       });
-      expect(response).toEqual({ accessToken: 'jwt-token' });
+      expect(response).toBeInstanceOf(LoginResponseDto);
+      expect(response).toEqual(expect.objectContaining({ accessToken: 'jwt-token' }));
     });
   });
 });

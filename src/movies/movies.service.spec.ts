@@ -1,7 +1,8 @@
 import { NotFoundException } from '@nestjs/common';
 import { Repository } from 'typeorm';
-import { MoviesService } from './movies.service';
+import { MovieResponseDto } from './dto/movie-response.dto';
 import { Movie } from './entities/movie.entity';
+import { MoviesService } from './movies.service';
 
 describe('MoviesService', () => {
   let moviesService: MoviesService;
@@ -27,14 +28,20 @@ describe('MoviesService', () => {
     moviesService = new MoviesService(repositoryMock as unknown as Repository<Movie>);
   });
 
-  it('findAll returns movies ordered by createdAt desc', async () => {
-    const movies = [{ id: '1' }, { id: '2' }] as Movie[];
+  it('findAll returns movies ordered by createdAt desc mapped to DTOs', async () => {
+    const movies = [
+      { id: '1', swapiUid: null, title: 'A New Hope', releaseYear: 1977, director: 'George Lucas', createdAt: new Date('2026-01-01'), updatedAt: new Date('2026-01-01') },
+      { id: '2', swapiUid: null, title: 'The Empire Strikes Back', releaseYear: 1980, director: 'Irvin Kershner', createdAt: new Date('2026-01-02'), updatedAt: new Date('2026-01-02') },
+    ] as Movie[];
     repositoryMock.find.mockResolvedValue(movies);
 
     const result = await moviesService.findAll();
 
     expect(repositoryMock.find).toHaveBeenCalledWith({ order: { createdAt: 'DESC' } });
-    expect(result).toEqual(movies);
+    expect(result).toHaveLength(2);
+    expect(result[0]).toBeInstanceOf(MovieResponseDto);
+    expect(result[0].id).toBe('1');
+    expect(result[1].id).toBe('2');
   });
 
   it('findById throws when movie does not exist', async () => {
@@ -43,25 +50,30 @@ describe('MoviesService', () => {
     await expect(moviesService.findById('missing-id')).rejects.toBeInstanceOf(NotFoundException);
   });
 
-  it('create persists and returns the created movie', async () => {
+  it('create persists and returns a MovieResponseDto', async () => {
     const payload = { title: 'A New Hope', releaseYear: 1977, director: 'George Lucas' };
-    const createdMovie = { id: 'movie-id', ...payload } as Movie;
-    repositoryMock.create.mockReturnValue(createdMovie);
-    repositoryMock.save.mockResolvedValue(createdMovie);
+    const savedMovie = { id: 'movie-id', swapiUid: null, ...payload, createdAt: new Date('2026-01-01'), updatedAt: new Date('2026-01-01') } as Movie;
+    repositoryMock.create.mockReturnValue(savedMovie);
+    repositoryMock.save.mockResolvedValue(savedMovie);
 
     const result = await moviesService.create(payload);
 
     expect(repositoryMock.create).toHaveBeenCalledWith(payload);
-    expect(repositoryMock.save).toHaveBeenCalledWith(createdMovie);
-    expect(result).toEqual(createdMovie);
+    expect(repositoryMock.save).toHaveBeenCalledWith(savedMovie);
+    expect(result).toBeInstanceOf(MovieResponseDto);
+    expect(result.id).toBe('movie-id');
+    expect(result.title).toBe('A New Hope');
   });
 
-  it('update merges payload and saves movie', async () => {
+  it('update merges payload and returns a MovieResponseDto', async () => {
     const current = {
       id: 'movie-id',
+      swapiUid: null,
       title: 'A New Hope',
       releaseYear: 1977,
       director: 'George Lucas',
+      createdAt: new Date('2026-01-01'),
+      updatedAt: new Date('2026-01-01'),
     } as Movie;
     const merged = { ...current, director: 'G. Lucas' } as Movie;
 
@@ -73,7 +85,8 @@ describe('MoviesService', () => {
 
     expect(repositoryMock.merge).toHaveBeenCalledWith(current, { director: 'G. Lucas' });
     expect(repositoryMock.save).toHaveBeenCalledWith(merged);
-    expect(result).toEqual(merged);
+    expect(result).toBeInstanceOf(MovieResponseDto);
+    expect(result.director).toBe('G. Lucas');
   });
 
   it('remove deletes existing movie and returns deleted true', async () => {

@@ -1,21 +1,10 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import { UserRole } from '../common/enums/user-role.enum';
 import { UsersService } from '../users/users.service';
+import { LoginResponseDto, SignupResponseDto } from './dto/auth-response.dto';
 import { LoginDto } from './dto/login.dto';
 import { SignupDto } from './dto/signup.dto';
-
-type SignupResponse = {
-  id: string;
-  email: string;
-  role: UserRole;
-  createdAt: Date;
-};
-
-type LoginResponse = {
-  accessToken: string;
-};
 
 @Injectable()
 export class AuthService {
@@ -24,22 +13,17 @@ export class AuthService {
     private readonly jwtService: JwtService,
   ) {}
 
-  async signup(signupDto: SignupDto): Promise<SignupResponse> {
+  async signup(signupDto: SignupDto): Promise<SignupResponseDto> {
     const passwordHash = await bcrypt.hash(signupDto.password, 10);
     const createdUser = await this.usersService.createRegularUser(
       signupDto.email.toLowerCase().trim(),
       passwordHash,
     );
 
-    return {
-      id: createdUser.id,
-      email: createdUser.email,
-      role: createdUser.role,
-      createdAt: createdUser.createdAt,
-    };
+    return SignupResponseDto.fromEntity(createdUser);
   }
 
-  async login(loginDto: LoginDto): Promise<LoginResponse> {
+  async login(loginDto: LoginDto): Promise<LoginResponseDto> {
     const email = loginDto.email.toLowerCase().trim();
     const user = await this.usersService.findByEmail(email);
 
@@ -58,6 +42,8 @@ export class AuthService {
       role: user.role,
     });
 
-    return { accessToken };
+    const dto = new LoginResponseDto();
+    dto.accessToken = accessToken;
+    return dto;
   }
 }

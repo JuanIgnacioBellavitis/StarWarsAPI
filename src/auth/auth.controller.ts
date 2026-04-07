@@ -17,6 +17,7 @@ import {
 import { CurrentUser } from './decorators/current-user.decorator';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { AuthService } from './auth.service';
+import { LoginResponseDto, MeResponseDto, SignupResponseDto } from './dto/auth-response.dto';
 import { LoginDto } from './dto/login.dto';
 import { SignupDto } from './dto/signup.dto';
 import { User } from '../users/entities/user.entity';
@@ -29,7 +30,7 @@ export class AuthController {
   @Post('signup')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Register a new regular user' })
-  @ApiCreatedResponse({ description: 'User created successfully' })
+  @ApiCreatedResponse({ type: SignupResponseDto, description: 'User created successfully' })
   signup(@Body() signupDto: SignupDto) {
     return this.authService.signup(signupDto);
   }
@@ -37,7 +38,7 @@ export class AuthController {
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Login and get access token' })
-  @ApiOkResponse({ description: 'Login successful' })
+  @ApiOkResponse({ type: LoginResponseDto, description: 'Login successful' })
   login(@Body() loginDto: LoginDto) {
     return this.authService.login(loginDto);
   }
@@ -46,12 +47,8 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get current authenticated user' })
-  @ApiOkResponse({ description: 'User profile retrieved successfully' })
-  me(@CurrentUser() user: User) {
-    return {
-      id: user.id,
-      email: user.email,
-      role: user.role,
-    };
+  @ApiOkResponse({ type: MeResponseDto, description: 'User profile retrieved successfully' })
+  me(@CurrentUser() user: User): MeResponseDto {
+    return MeResponseDto.fromEntity(user);
   }
 }
