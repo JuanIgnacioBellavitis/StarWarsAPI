@@ -102,10 +102,6 @@ Ejecutar tests unitarios:
 npm test
 ```
 
-Estado actual:
-- 7 test suites
-- 28 tests passing
-
 ## Documentacion adicional
 
 - Guia Postman: `docs/postman-endpoints-guide.md`
