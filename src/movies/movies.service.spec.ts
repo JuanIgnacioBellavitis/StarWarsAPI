@@ -30,8 +30,8 @@ describe('MoviesService', () => {
 
   it('findAll returns movies ordered by createdAt desc mapped to DTOs', async () => {
     const movies = [
-      { id: '1', swapiUid: null, title: 'A New Hope', releaseYear: 1977, director: 'George Lucas', createdAt: new Date('2026-01-01'), updatedAt: new Date('2026-01-01') },
-      { id: '2', swapiUid: null, title: 'The Empire Strikes Back', releaseYear: 1980, director: 'Irvin Kershner', createdAt: new Date('2026-01-02'), updatedAt: new Date('2026-01-02') },
+      { id: '1', swapiUid: null, title: 'A New Hope', releaseYear: 1977, director: 'George Lucas', openingCrawl: null, producer: null, episodeId: null, characters: [], planets: [], species: [], starships: [], vehicles: [], createdAt: new Date('2026-01-01'), updatedAt: new Date('2026-01-01') },
+      { id: '2', swapiUid: null, title: 'The Empire Strikes Back', releaseYear: 1980, director: 'Irvin Kershner', openingCrawl: null, producer: null, episodeId: null, characters: [], planets: [], species: [], starships: [], vehicles: [], createdAt: new Date('2026-01-02'), updatedAt: new Date('2026-01-02') },
     ] as Movie[];
     repositoryMock.find.mockResolvedValue(movies);
 
@@ -50,9 +50,41 @@ describe('MoviesService', () => {
     await expect(moviesService.findById('missing-id')).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  it('findById returns enriched MovieResponseDto with relations', async () => {
+    const movie = {
+      id: 'movie-id',
+      swapiUid: '1',
+      title: 'A New Hope',
+      releaseYear: 1977,
+      director: 'George Lucas',
+      openingCrawl: 'It is a period of civil war...',
+      producer: 'Gary Kurtz',
+      episodeId: 4,
+      characters: [{ swapiUid: '1', name: 'Luke Skywalker' }],
+      planets: [{ swapiUid: '1', name: 'Tatooine' }],
+      species: [{ swapiUid: '1', name: 'Human' }],
+      starships: [{ swapiUid: '2', name: 'CR90 corvette' }],
+      vehicles: [{ swapiUid: '4', name: 'Sand Crawler' }],
+      createdAt: new Date('2026-01-01'),
+      updatedAt: new Date('2026-01-01'),
+    } as Movie;
+    repositoryMock.findOne.mockResolvedValue(movie);
+
+    const result = await moviesService.findById('movie-id');
+
+    expect(repositoryMock.findOne).toHaveBeenCalledWith({
+      where: { id: 'movie-id' },
+      relations: ['characters', 'planets', 'species', 'starships', 'vehicles'],
+    });
+    expect(result).toBeInstanceOf(MovieResponseDto);
+    expect(result.characters).toEqual(['Luke Skywalker']);
+    expect(result.planets).toEqual(['Tatooine']);
+    expect(result.openingCrawl).toBe('It is a period of civil war...');
+  });
+
   it('create persists and returns a MovieResponseDto', async () => {
     const payload = { title: 'A New Hope', releaseYear: 1977, director: 'George Lucas' };
-    const savedMovie = { id: 'movie-id', swapiUid: null, ...payload, createdAt: new Date('2026-01-01'), updatedAt: new Date('2026-01-01') } as Movie;
+    const savedMovie = { id: 'movie-id', swapiUid: null, openingCrawl: null, producer: null, episodeId: null, characters: [], planets: [], species: [], starships: [], vehicles: [], ...payload, createdAt: new Date('2026-01-01'), updatedAt: new Date('2026-01-01') } as Movie;
     repositoryMock.create.mockReturnValue(savedMovie);
     repositoryMock.save.mockResolvedValue(savedMovie);
 
@@ -72,6 +104,14 @@ describe('MoviesService', () => {
       title: 'A New Hope',
       releaseYear: 1977,
       director: 'George Lucas',
+      openingCrawl: null,
+      producer: null,
+      episodeId: null,
+      characters: [],
+      planets: [],
+      species: [],
+      starships: [],
+      vehicles: [],
       createdAt: new Date('2026-01-01'),
       updatedAt: new Date('2026-01-01'),
     } as Movie;

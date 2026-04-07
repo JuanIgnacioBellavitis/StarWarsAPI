@@ -1,71 +1,74 @@
-import { HttpService } from '@nestjs/axios';
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { firstValueFrom } from 'rxjs';
 import { Repository } from 'typeorm';
 import { Movie } from '../movies/entities/movie.entity';
+import { Person } from './entities/person.entity';
+import { Planet } from './entities/planet.entity';
+import { Species } from './entities/species.entity';
+import { Starship } from './entities/starship.entity';
+import { Vehicle } from './entities/vehicle.entity';
+import { SwapiClient, SwapiNamedResource } from './swapi-client.service';
 
-type SwapiListResponse = {
-  result?: Array<{
-    uid?: string;
-    url?: string;
-    properties?: {
-      title?: string;
-      release_date?: string;
-      director?: string;
-    };
-  }>;
-};
-
-type SwapiDetailResponse = {
-  result?: {
-    uid?: string;
-    properties?: {
-      title?: string;
-      release_date?: string;
-      director?: string;
-    };
-  };
+type SyncResult = {
+  imported: number;
+  updated: number;
+  skipped: number;
 };
 
 @Injectable()
 export class SwapiSyncService {
   private readonly logger = new Logger(SwapiSyncService.name);
-  private readonly baseUrl = 'https://www.swapi.tech/api/films';
 
   constructor(
-    private readonly httpService: HttpService,
+    private readonly swapiClient: SwapiClient,
     @InjectRepository(Movie)
     private readonly moviesRepository: Repository<Movie>,
+    @InjectRepository(Person)
+    private readonly peopleRepository: Repository<Person>,
+    @InjectRepository(Planet)
+    private readonly planetsRepository: Repository<Planet>,
+    @InjectRepository(Species)
+    private readonly speciesRepository: Repository<Species>,
+    @InjectRepository(Starship)
+    private readonly starshipsRepository: Repository<Starship>,
+    @InjectRepository(Vehicle)
+    private readonly vehiclesRepository: Repository<Vehicle>,
   ) {}
 
-  async syncMovies(): Promise<{ imported: number; updated: number; skipped: number }> {
-    const listResponse = await firstValueFrom(
-      this.httpService.get<SwapiListResponse>(this.baseUrl),
-    );
-    const items = listResponse.data.result ?? [];
+  async syncMovies(): Promise<SyncResult> {
+    await this.syncAllRelatedEntities();
+
+    const films = await this.swapiClient.fetchFilms();
 
     let imported = 0;
     let updated = 0;
     let skipped = 0;
 
-    for (const item of items) {
-      const detail = await this.resolveFilmDetail(item);
-      if (!detail.uid || !detail.title || !detail.director || !detail.releaseYear) {
+    for (const item of films) {
+      const properties = await this.resolveFilmProperties(item);
+      if (!properties) {
         skipped += 1;
         continue;
       }
 
-      const existing = await this.moviesRepository.findOne({
-        where: { swapiUid: detail.uid },
-      });
+      const { uid, title, director, releaseYear, openingCrawl, producer, episodeId,
+        characterUids, planetUids, speciesUids, starshipUids, vehicleUids } = properties;
+
+      const [characters, planets, species, starships, vehicles] = await Promise.all([
+        this.findEntitiesByUids(this.peopleRepository, characterUids),
+        this.findEntitiesByUids(this.planetsRepository, planetUids),
+        this.findEntitiesByUids(this.speciesRepository, speciesUids),
+        this.findEntitiesByUids(this.starshipsRepository, starshipUids),
+        this.findEntitiesByUids(this.vehiclesRepository, vehicleUids),
+      ]);
+
+      const existing = await this.moviesRepository.findOne({ where: { swapiUid: uid } });
 
       if (!existing) {
         const created = this.moviesRepository.create({
-          swapiUid: detail.uid,
-          title: detail.title,
-          director: detail.director,
-          releaseYear: detail.releaseYear,
+          swapiUid: uid, title, director, releaseYear,
+          openingCrawl, producer, episodeId,
+          characters, planets, species, starships, vehicles,
         });
         await this.moviesRepository.save(created);
         imported += 1;
@@ -73,18 +76,22 @@ export class SwapiSyncService {
       }
 
       const changed =
-        existing.title !== detail.title ||
-        existing.director !== detail.director ||
-        existing.releaseYear !== detail.releaseYear;
+        existing.title !== title ||
+        existing.director !== director ||
+        existing.releaseYear !== releaseYear ||
+        existing.openingCrawl !== openingCrawl ||
+        existing.producer !== producer ||
+        existing.episodeId !== episodeId;
 
       if (!changed) {
         skipped += 1;
         continue;
       }
 
-      existing.title = detail.title;
-      existing.director = detail.director;
-      existing.releaseYear = detail.releaseYear;
+      Object.assign(existing, {
+        title, director, releaseYear, openingCrawl, producer, episodeId,
+        characters, planets, species, starships, vehicles,
+      });
       await this.moviesRepository.save(existing);
       updated += 1;
     }
@@ -93,51 +100,107 @@ export class SwapiSyncService {
     return { imported, updated, skipped };
   }
 
-  private async resolveFilmDetail(item: {
+  private async syncAllRelatedEntities(): Promise<void> {
+    await Promise.all([
+      this.syncNamedEntities('people', this.peopleRepository),
+      this.syncNamedEntities('planets', this.planetsRepository),
+      this.syncNamedEntities('species', this.speciesRepository),
+      this.syncNamedEntities('starships', this.starshipsRepository),
+      this.syncNamedEntities('vehicles', this.vehiclesRepository),
+    ]);
+  }
+
+  private async syncNamedEntities<T extends { swapiUid: string; name: string }>(
+    endpoint: string,
+    repository: Repository<T>,
+  ): Promise<void> {
+    const resources = await this.swapiClient.fetchAllPages(endpoint);
+    for (const resource of resources) {
+      const existing = await repository.findOne({ where: { swapiUid: resource.uid } as never });
+      if (!existing) {
+        const entity = repository.create({ swapiUid: resource.uid, name: resource.name } as never);
+        await repository.save(entity as never);
+      }
+    }
+  }
+
+  private async findEntitiesByUids<T extends { swapiUid: string }>(
+    repository: Repository<T>,
+    uids: string[],
+  ): Promise<T[]> {
+    if (!uids.length) return [];
+    const entities = await Promise.all(
+      uids.map((uid) => repository.findOne({ where: { swapiUid: uid } as never })),
+    );
+    return entities.filter((e) => e !== null) as T[];
+  }
+
+  private async resolveFilmProperties(item: {
     uid?: string;
     url?: string;
     properties?: {
       title?: string;
-      release_date?: string;
       director?: string;
+      producer?: string;
+      release_date?: string;
+      opening_crawl?: string;
+      episode_id?: number;
+      characters?: string[];
+      planets?: string[];
+      species?: string[];
+      starships?: string[];
+      vehicles?: string[];
     };
-  }): Promise<{ uid?: string; title?: string; director?: string; releaseYear?: number }> {
-    if (item.properties) {
-      return {
-        uid: item.uid,
-        title: item.properties.title,
-        director: item.properties.director,
-        releaseYear: this.extractReleaseYear(item.properties.release_date),
-      };
+  }): Promise<{
+    uid: string;
+    title: string;
+    director: string;
+    releaseYear: number;
+    openingCrawl: string | null;
+    producer: string | null;
+    episodeId: number | null;
+    characterUids: string[];
+    planetUids: string[];
+    speciesUids: string[];
+    starshipUids: string[];
+    vehicleUids: string[];
+  } | null> {
+    let props = item.properties;
+
+    if (!props && item.url) {
+      const detail = await this.swapiClient.fetchFilmDetail(item.url);
+      props = detail?.properties;
     }
 
-    if (!item.url) {
-      return { uid: item.uid };
-    }
+    const uid = item.uid;
+    const title = props?.title;
+    const director = props?.director;
+    const releaseYear = this.extractReleaseYear(props?.release_date);
 
-    const detailResponse = await firstValueFrom(
-      this.httpService.get<SwapiDetailResponse>(item.url),
-    );
-    const detail = detailResponse.data.result;
+    if (!uid || !title || !director || !releaseYear) return null;
+
+    const extractUids = (urls?: string[]): string[] =>
+      (urls ?? []).map((u) => this.swapiClient.extractUidFromUrl(u)).filter(Boolean);
 
     return {
-      uid: detail?.uid ?? item.uid,
-      title: detail?.properties?.title,
-      director: detail?.properties?.director,
-      releaseYear: this.extractReleaseYear(detail?.properties?.release_date),
+      uid,
+      title,
+      director,
+      releaseYear,
+      openingCrawl: props?.opening_crawl ?? null,
+      producer: props?.producer ?? null,
+      episodeId: props?.episode_id ?? null,
+      characterUids: extractUids(props?.characters),
+      planetUids: extractUids(props?.planets),
+      speciesUids: extractUids(props?.species),
+      starshipUids: extractUids(props?.starships),
+      vehicleUids: extractUids(props?.vehicles),
     };
   }
 
   private extractReleaseYear(releaseDate?: string): number | undefined {
-    if (!releaseDate) {
-      return undefined;
-    }
-
-    const releaseYear = new Date(releaseDate).getUTCFullYear();
-    if (Number.isNaN(releaseYear)) {
-      return undefined;
-    }
-
-    return releaseYear;
+    if (!releaseDate) return undefined;
+    const year = new Date(releaseDate).getUTCFullYear();
+    return Number.isNaN(year) ? undefined : year;
   }
 }
