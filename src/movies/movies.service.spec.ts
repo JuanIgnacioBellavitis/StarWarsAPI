@@ -37,7 +37,10 @@ describe('MoviesService', () => {
 
     const result = await moviesService.findAll();
 
-    expect(repositoryMock.find).toHaveBeenCalledWith({ order: { createdAt: 'DESC' } });
+    expect(repositoryMock.find).toHaveBeenCalledWith({
+      order: { createdAt: 'DESC' },
+      relations: ['characters', 'planets', 'species', 'starships', 'vehicles'],
+    });
     expect(result).toHaveLength(2);
     expect(result[0]).toBeInstanceOf(MovieResponseDto);
     expect(result[0].id).toBe('1');

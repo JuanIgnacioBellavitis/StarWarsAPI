@@ -16,6 +16,7 @@ export class MoviesService {
   async findAll(): Promise<MovieResponseDto[]> {
     const movies = await this.moviesRepository.find({
       order: { createdAt: 'DESC' },
+      relations: ['characters', 'planets', 'species', 'starships', 'vehicles'],
     });
     return movies.map(MovieResponseDto.fromEntity);
   }
