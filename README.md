@@ -65,7 +65,7 @@ Servidor local:
 ### Movies
 
 - `GET /movies` (`REGULAR` o `ADMIN`)
-- `GET /movies/:id` (`REGULAR` o `ADMIN`)
+- `GET /movies/:id` (`REGULAR`) — acepta UUID o numero de episodio SWAPI (e.g., `/movies/1`)
 - `POST /movies` (`ADMIN`)
 - `PATCH /movies/:id` (`ADMIN`)
 - `DELETE /movies/:id` (`ADMIN`)
@@ -105,7 +105,6 @@ npm test
 ## Documentacion adicional
 
 - Guia Postman: `docs/postman-endpoints-guide.md`
-- Queries SQL de apoyo: `docs/database-queries.md`
 
 ## Autor
 Juan Ignacio Bellavitis
