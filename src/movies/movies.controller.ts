@@ -38,7 +38,7 @@ export class MoviesController {
   }
 
   @Get(':id')
-  @Roles(UserRole.ADMIN, UserRole.REGULAR)
+  @Roles(UserRole.REGULAR)
   @ApiOperation({ summary: 'Get a movie detail' })
   @ApiOkResponse({ description: 'Movie retrieved successfully' })
   findById(@Param('id') id: string) {
