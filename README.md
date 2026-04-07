@@ -104,7 +104,7 @@ npm test
 
 ## Documentacion adicional
 
-- Guia Postman: `docs/postman-endpoints-guide.md`
+- Referencia de endpoints: `docs/postman-endpoints-guide.md`
 
 ## Autor
 Juan Ignacio Bellavitis
