@@ -6,6 +6,11 @@ import { MovieResponseDto } from './dto/movie-response.dto';
 import { UpdateMovieDto } from './dto/update-movie.dto';
 import { Movie } from './entities/movie.entity';
 
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const MOVIE_RELATIONS = ['characters', 'planets', 'species', 'starships', 'vehicles'];
+
 @Injectable()
 export class MoviesService {
   constructor(
@@ -16,15 +21,21 @@ export class MoviesService {
   async findAll(): Promise<MovieResponseDto[]> {
     const movies = await this.moviesRepository.find({
       order: { createdAt: 'DESC' },
-      relations: ['characters', 'planets', 'species', 'starships', 'vehicles'],
+      relations: MOVIE_RELATIONS,
+      relationLoadStrategy: 'query',
     });
     return movies.map(MovieResponseDto.fromEntity);
   }
 
-  async findById(id: string): Promise<MovieResponseDto> {
+  async findById(identifier: string): Promise<MovieResponseDto> {
+    const where = UUID_REGEX.test(identifier)
+      ? { id: identifier }
+      : { swapiUid: identifier };
+
     const movie = await this.moviesRepository.findOne({
-      where: { id },
-      relations: ['characters', 'planets', 'species', 'starships', 'vehicles'],
+      where,
+      relations: MOVIE_RELATIONS,
+      relationLoadStrategy: 'query',
     });
     if (!movie) {
       throw new NotFoundException('Movie not found');

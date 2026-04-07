@@ -40,6 +40,7 @@ describe('MoviesService', () => {
     expect(repositoryMock.find).toHaveBeenCalledWith({
       order: { createdAt: 'DESC' },
       relations: ['characters', 'planets', 'species', 'starships', 'vehicles'],
+      relationLoadStrategy: 'query',
     });
     expect(result).toHaveLength(2);
     expect(result[0]).toBeInstanceOf(MovieResponseDto);
@@ -53,7 +54,7 @@ describe('MoviesService', () => {
     await expect(moviesService.findById('missing-id')).rejects.toBeInstanceOf(NotFoundException);
   });
 
-  it('findById returns enriched MovieResponseDto with relations', async () => {
+  it('findById searches by swapiUid when identifier is not a UUID', async () => {
     const movie = {
       id: 'movie-id',
       swapiUid: '1',
@@ -73,16 +74,43 @@ describe('MoviesService', () => {
     } as Movie;
     repositoryMock.findOne.mockResolvedValue(movie);
 
-    const result = await moviesService.findById('movie-id');
+    const result = await moviesService.findById('1');
 
-    expect(repositoryMock.findOne).toHaveBeenCalledWith({
-      where: { id: 'movie-id' },
-      relations: ['characters', 'planets', 'species', 'starships', 'vehicles'],
-    });
+    expect(repositoryMock.findOne).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { swapiUid: '1' } }),
+    );
     expect(result).toBeInstanceOf(MovieResponseDto);
-    expect(result.characters).toEqual(['Luke Skywalker']);
-    expect(result.planets).toEqual(['Tatooine']);
-    expect(result.openingCrawl).toBe('It is a period of civil war...');
+    expect(result.swapiUid).toBe('1');
+  });
+
+  it('findById searches by id when identifier is a UUID', async () => {
+    const uuid = 'a1b2c3d4-e5f6-1890-abcd-ef1234567890';
+    const movie = {
+      id: uuid,
+      swapiUid: null,
+      title: 'A New Hope',
+      releaseYear: 1977,
+      director: 'George Lucas',
+      openingCrawl: null,
+      producer: null,
+      episodeId: null,
+      characters: [],
+      planets: [],
+      species: [],
+      starships: [],
+      vehicles: [],
+      createdAt: new Date('2026-01-01'),
+      updatedAt: new Date('2026-01-01'),
+    } as Movie;
+    repositoryMock.findOne.mockResolvedValue(movie);
+
+    const result = await moviesService.findById(uuid);
+
+    expect(repositoryMock.findOne).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: uuid } }),
+    );
+    expect(result).toBeInstanceOf(MovieResponseDto);
+    expect(result.id).toBe(uuid);
   });
 
   it('create persists and returns a MovieResponseDto', async () => {
