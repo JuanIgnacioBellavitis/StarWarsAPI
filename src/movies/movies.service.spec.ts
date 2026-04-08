@@ -1,8 +1,15 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Repository } from 'typeorm';
+import { Person } from '../swapi-sync/entities/person.entity';
+import { Planet } from '../swapi-sync/entities/planet.entity';
+import { Species } from '../swapi-sync/entities/species.entity';
+import { Starship } from '../swapi-sync/entities/starship.entity';
+import { Vehicle } from '../swapi-sync/entities/vehicle.entity';
 import { MovieResponseDto } from './dto/movie-response.dto';
 import { Movie } from './entities/movie.entity';
 import { MoviesService } from './movies.service';
+
+const makeRelationRepoMock = () => ({ findBy: jest.fn() });
 
 describe('MoviesService', () => {
   let moviesService: MoviesService;
@@ -14,6 +21,11 @@ describe('MoviesService', () => {
     merge: jest.Mock;
     remove: jest.Mock;
   };
+  let peopleMock: { findBy: jest.Mock };
+  let planetsMock: { findBy: jest.Mock };
+  let speciesMock: { findBy: jest.Mock };
+  let starshipsMock: { findBy: jest.Mock };
+  let vehiclesMock: { findBy: jest.Mock };
 
   beforeEach(() => {
     repositoryMock = {
@@ -24,8 +36,20 @@ describe('MoviesService', () => {
       merge: jest.fn(),
       remove: jest.fn(),
     };
+    peopleMock = makeRelationRepoMock();
+    planetsMock = makeRelationRepoMock();
+    speciesMock = makeRelationRepoMock();
+    starshipsMock = makeRelationRepoMock();
+    vehiclesMock = makeRelationRepoMock();
 
-    moviesService = new MoviesService(repositoryMock as unknown as Repository<Movie>);
+    moviesService = new MoviesService(
+      repositoryMock as unknown as Repository<Movie>,
+      peopleMock as unknown as Repository<Person>,
+      planetsMock as unknown as Repository<Planet>,
+      speciesMock as unknown as Repository<Species>,
+      starshipsMock as unknown as Repository<Starship>,
+      vehiclesMock as unknown as Repository<Vehicle>,
+    );
   });
 
   it('findAll returns movies ordered by createdAt desc mapped to DTOs', async () => {
@@ -128,6 +152,31 @@ describe('MoviesService', () => {
     expect(result.title).toBe('A New Hope');
   });
 
+  it('create resolves characterUids and associates characters', async () => {
+    const payload = { title: 'A New Hope', releaseYear: 1977, director: 'George Lucas', characterUids: ['1'] };
+    const person = { id: 'person-uuid', swapiUid: '1', name: 'Luke Skywalker' } as Person;
+    const movieBase = { id: 'movie-id', swapiUid: null, openingCrawl: null, producer: null, episodeId: null, characters: [], planets: [], species: [], starships: [], vehicles: [], title: payload.title, releaseYear: payload.releaseYear, director: payload.director, createdAt: new Date(), updatedAt: new Date() } as Movie;
+    peopleMock.findBy.mockResolvedValue([person]);
+    repositoryMock.create.mockReturnValue(movieBase);
+    const savedMovie = { ...movieBase, characters: [person] } as Movie;
+    repositoryMock.save.mockResolvedValue(savedMovie);
+
+    const result = await moviesService.create(payload);
+
+    expect(peopleMock.findBy).toHaveBeenCalled();
+    expect(result).toBeInstanceOf(MovieResponseDto);
+    expect(result.characters).toEqual(['Luke Skywalker']);
+  });
+
+  it('create throws BadRequestException when a characterUid does not exist', async () => {
+    const payload = { title: 'A New Hope', releaseYear: 1977, director: 'George Lucas', characterUids: ['999'] };
+    const movieBase = { id: 'movie-id', swapiUid: null, openingCrawl: null, producer: null, episodeId: null, characters: [], planets: [], species: [], starships: [], vehicles: [], title: payload.title, releaseYear: payload.releaseYear, director: payload.director, createdAt: new Date(), updatedAt: new Date() } as Movie;
+    peopleMock.findBy.mockResolvedValue([]);
+    repositoryMock.create.mockReturnValue(movieBase);
+
+    await expect(moviesService.create(payload)).rejects.toBeInstanceOf(BadRequestException);
+  });
+
   it('update merges payload and returns a MovieResponseDto', async () => {
     const current = {
       id: 'movie-id',
@@ -158,6 +207,29 @@ describe('MoviesService', () => {
     expect(repositoryMock.save).toHaveBeenCalledWith(merged);
     expect(result).toBeInstanceOf(MovieResponseDto);
     expect(result.director).toBe('G. Lucas');
+  });
+
+  it('update replaces characters when characterUids provided', async () => {
+    const current = {
+      id: 'movie-id', swapiUid: null, title: 'A New Hope', releaseYear: 1977, director: 'George Lucas',
+      openingCrawl: null, producer: null, episodeId: null,
+      characters: [], planets: [], species: [], starships: [], vehicles: [],
+      createdAt: new Date('2026-01-01'), updatedAt: new Date('2026-01-01'),
+    } as Movie;
+    const person = { id: 'person-uuid', swapiUid: '1', name: 'Luke Skywalker' } as Person;
+    const merged = { ...current } as Movie;
+    const saved = { ...merged, characters: [person] } as Movie;
+
+    repositoryMock.findOne.mockResolvedValue(current);
+    repositoryMock.merge.mockReturnValue(merged);
+    peopleMock.findBy.mockResolvedValue([person]);
+    repositoryMock.save.mockResolvedValue(saved);
+
+    const result = await moviesService.update('movie-id', { characterUids: ['1'] });
+
+    expect(peopleMock.findBy).toHaveBeenCalled();
+    expect(result).toBeInstanceOf(MovieResponseDto);
+    expect(result.characters).toEqual(['Luke Skywalker']);
   });
 
   it('remove deletes existing movie and returns deleted true', async () => {

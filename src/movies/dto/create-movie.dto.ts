@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsInt, IsString, Max, Min, MinLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsArray, IsInt, IsOptional, IsString, Max, Min, MinLength } from 'class-validator';
 
 export class CreateMovieDto {
   @ApiProperty({ example: 'A New Hope' })
@@ -17,4 +17,34 @@ export class CreateMovieDto {
   @IsString()
   @MinLength(1)
   director: string;
+
+  @ApiPropertyOptional({ example: ['1', '2'], description: 'SWAPI UIDs of characters to associate' })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  characterUids?: string[];
+
+  @ApiPropertyOptional({ example: ['1', '2'], description: 'SWAPI UIDs of planets to associate' })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  planetUids?: string[];
+
+  @ApiPropertyOptional({ example: ['1', '2'], description: 'SWAPI UIDs of species to associate' })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  speciesUids?: string[];
+
+  @ApiPropertyOptional({ example: ['2', '3'], description: 'SWAPI UIDs of starships to associate' })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  starshipUids?: string[];
+
+  @ApiPropertyOptional({ example: ['4', '6'], description: 'SWAPI UIDs of vehicles to associate' })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  vehicleUids?: string[];
 }
