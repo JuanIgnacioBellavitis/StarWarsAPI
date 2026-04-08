@@ -66,8 +66,8 @@ Servidor local:
 
 - `GET /movies` (`REGULAR` o `ADMIN`)
 - `GET /movies/:id` (`REGULAR`) — acepta UUID o numero de episodio SWAPI (e.g., `/movies/1`)
-- `POST /movies` (`ADMIN`)
-- `PATCH /movies/:id` (`ADMIN`)
+- `POST /movies` (`ADMIN`) — campos opcionales: `characterUids`, `planetUids`, `speciesUids`, `starshipUids`, `vehicleUids`
+- `PATCH /movies/:id` (`ADMIN`) — mismos campos opcionales de relaciones
 - `DELETE /movies/:id` (`ADMIN`)
 
 ### SWAPI Sync
